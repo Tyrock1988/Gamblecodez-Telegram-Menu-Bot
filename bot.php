@@ -498,7 +498,56 @@ if ($message && get_user_state($user_id, 'await_bug', 0) === 1 && $text !== '' &
 
 /* ---------- ADMIN QUICK ADD (compat) ---------- */
 if ($message && $user_id == $ADMIN_ID && preg_match('/^([^|]+)\|([^|]+)\|([^|]+)(?:\|(.*))?$/', $text, $m)) {
-    $cat = trim($m[1]); $name=trim($m[2]); $url=trim($m[3]); $rest=trim($m[4]??'');
-    $tags=''; $promo=''; $pin=false;
-    if ($rest!=='') {
-        $parts = explode('|', 
+    $cat  = trim($m[1]);
+    $name = trim($m[2]);
+    $url  = trim($m[3]);
+    $rest = trim($m[4] ?? '');
+
+    $tags  = '';
+    $promo = '';
+    $pin   = false;
+
+    if ($rest !== '') {
+        $parts = explode('|', $rest);
+        if (count($parts) === 1) {
+            $tags = $parts[0];
+        } else {
+            $tags  = trim($parts[0]);
+            $promo = trim($parts[1] ?? '');
+            $pin   = (strtolower(trim($parts[2] ?? '')) === 'pin');
+        }
+    }
+
+    if (!isset($menu[$cat])) $menu[$cat] = [];
+
+    $found = null;
+    foreach ($menu[$cat] as $i => $it) {
+        if (strcasecmp($it['name'] ?? '', $name) === 0) { $found = $i; break; }
+    }
+
+    $entry = ['name' => $name, 'url' => $url];
+    if ($tags !== '')  $entry['tags']  = $tags;
+    if ($promo !== '') $entry['promo'] = ($promo === 'promo' ? true : $promo);
+    $entry['pin'] = $pin;
+
+    if ($found !== null) {
+        $menu[$cat][$found] = array_merge($menu[$cat][$found], $entry);
+        sort_category_entries($menu[$cat]);
+        jsonbin_save_menu($menu);
+        tg_send_message($chat_id, "Updated {$name} in {$cat}.");
+    } else {
+        $menu[$cat][] = $entry;
+        sort_category_entries($menu[$cat]);
+        jsonbin_save_menu($menu);
+        tg_send_message($chat_id, "Added {$name} to {$cat}.");
+    }
+    exit;
+}
+
+/* ---------- FALLBACK: INVALID INPUT ---------- */
+if ($message && $text !== '') {
+    tg_send_message($chat_id, "Invalid input. Please use the buttons to navigate the menu.");
+}
+exit;
+?>
+```0
